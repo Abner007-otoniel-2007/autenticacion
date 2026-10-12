@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+**Autenticación segura con Next.js 16 y Supabase**
 
-## Getting Started
+Aplicación web con sistema de autenticación completo construida con Next.js, Supabase y TypeScript. 
 
-First, run the development server:
+Sitio en producción: autenticacion-dpnerjfdr-abner007-otoniel-2007.vercel.app
+Repositorio: https://github.com/Abner007-otoniel-2007/autenticacion.git
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+**Funcionalidades**
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+-Registro con validación de formularios.
+-Inicio y cierre de sesión.
+-Verificación de correo electrónico.
+-Recuperación y restablecimiento de contraseña.
+-Dashboard privado con la información del usuario autenticado.
+-Navegación condicional según el estado de la sesión.
+-Refresco automático de la sesión.
+-Estados de carga y mensajes de error informativos pero seguros.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Instalación**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Clona el repositorio (link arriba) y descarga las dependencias:
+pnpm install
 
-## Learn More
+2. Crea el archivo .env.local en la raíz del proyecto y colocar las variables de entorno: 
+NEXT_PUBLIC_SUPABASE_URL=https://tvmqhvnwlhcnadkjypuy.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_qNSiywtexm4W2PXVRX3vDQ_Su-7Xw6L
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
-To learn more about Next.js, take a look at the following resources:
+3. Configura supabase:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+para realizarlo tienes que crear la base de datos con el siguiente script:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+create table public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  full_name text,
+  created_at timestamptz not null default now()
+);
 
-## Deploy on Vercel
+alter table public.profiles enable row level security;
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+create policy "Ver mi perfil" on public.profiles
+  for select using ((select auth.uid()) = id);
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+create policy "Actualizar mi perfil" on public.profiles
+  for update using ((select auth.uid()) = id);
+
+create function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  insert into public.profiles (id, full_name)
+  values (new.id, new.raw_user_meta_data ->> 'full_name');
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+4. Inicia el servidor (pnpm dev)
+
+5. Abre la url que te proporciona: http://localhost:3000.
